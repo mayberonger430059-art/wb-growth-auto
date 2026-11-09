@@ -13,7 +13,7 @@
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D18-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
 [![Dependencies](https://img.shields.io/badge/dependencies-0-blue)](#)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)](#)
-[![Version](https://img.shields.io/badge/version-1.1.0-orange)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.1.1-orange)](CHANGELOG.md)
 
 [功能](#-功能一览) · [快速开始](#-快速开始) · [架构](#-架构) · [命令参考](#-命令参考) · [安全](#-安全设计) · [迭代](#-版本与迭代)
 
