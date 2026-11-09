@@ -8,6 +8,7 @@
 //   node wb-tasks.cjs experts "专家名1" ["专家名2" ...]  # 召唤专家并发起对话
 //   node wb-tasks.cjs teams "专家团名1" ...              # 召唤专家团
 //   node wb-tasks.cjs templates                          # 五个分类模板各发一条
+//   node wb-tasks.cjs automation "名" "提示词"            # 新建定时任务（含权限确认）
 //   node wb-tasks.cjs app                                # 打开「发现应用」并启动第一个应用
 //   node wb-tasks.cjs pending                            # 列出「待确认」会话
 //   node wb-tasks.cjs tc "<会话名>"                       # 真实鼠标点击切换会话
@@ -132,6 +133,119 @@ async function backHome(s) {
   await sleep(1500);
 }
 
+// 新建定时任务。
+// 实测三个硬点（Hy4 5.9.3）：
+//   1. 编辑器是 Slate.js —— execCommand / value 赋值都不进它的 model，「确定」永远是灰的，
+//      必须真实点击聚焦 + Ctrl+A + Delete + Input.insertText。
+//   2. 「允许完全访问」确认弹窗必须先勾「我已了解风险」，否则按钮点不动。
+//   3. 该按钮用 JS .click() 会被 tooltip 遮挡，必须 Input.dispatchMouseEvent。
+async function createAutomation(s, name, prompt) {
+  const ev = (e) => s.eval(e);
+  const step = [];
+
+  // 进定时任务页
+  const nav = await ev(`(async()=>{const sp=ms=>new Promise(r=>setTimeout(r,ms));
+    const b=[...document.querySelectorAll('button')].find(x=>x.offsetHeight>0&&x.innerText.trim()==='定时任务');
+    if(!b) return 'no-nav'; b.click(); await sp(2500); return 'ok'})()`);
+  if (nav !== "ok") return { ok: false, err: "找不到「定时任务」导航", step };
+  step.push("进定时任务页");
+
+  // 新建
+  const nw = await ev(`(async()=>{const sp=ms=>new Promise(r=>setTimeout(r,ms));
+    const b=[...document.querySelectorAll('button')].find(x=>x.offsetHeight>0&&x.innerText.trim()==='新建');
+    if(!b) return 'no-new'; b.click(); await sp(2500);
+    return document.querySelector('input[placeholder="输入任务名称"]')?'ok':'no-form'})()`);
+  if (nw !== "ok") return { ok: false, err: "新建表单没打开", step };
+  step.push("打开新建表单");
+
+  // 名称
+  await ev(`(()=>{
+    const i=document.querySelector('input[placeholder="输入任务名称"]'); if(!i) return 0;
+    const set=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set;
+    set.call(i, ${JSON.stringify(name)});
+    i.dispatchEvent(new Event('input',{bubbles:true}));
+    i.dispatchEvent(new Event('change',{bubbles:true}));
+    return 1;
+  })()`);
+  step.push("填名称");
+
+  // 提示词：Slate 必须真实键盘输入
+  const box = await ev(`(()=>{
+    const ed=[...document.querySelectorAll('[contenteditable=true]')].filter(e=>e.offsetHeight>0)[0];
+    if(!ed) return null; const r=ed.getBoundingClientRect();
+    return {x:r.left+r.width/2, y:r.top+r.height/2};
+  })()`);
+  if (!box) return { ok: false, err: "找不到提示词编辑器", step };
+
+  await s.clickAt(box.x, box.y);
+  await sleep(400);
+  const key = (o) => s.send("Input.dispatchKeyEvent", o);
+  await key({ type: "keyDown", modifiers: 2, key: "a", code: "KeyA", windowsVirtualKeyCode: 65, nativeVirtualKeyCode: 65 });
+  await key({ type: "keyUp", modifiers: 2, key: "a", code: "KeyA", windowsVirtualKeyCode: 65, nativeVirtualKeyCode: 65 });
+  await sleep(250);
+  await key({ type: "keyDown", key: "Delete", code: "Delete", windowsVirtualKeyCode: 46, nativeVirtualKeyCode: 46 });
+  await key({ type: "keyUp", key: "Delete", code: "Delete", windowsVirtualKeyCode: 46, nativeVirtualKeyCode: 46 });
+  await sleep(350);
+  await s.send("Input.insertText", { text: prompt });
+  await sleep(1000);
+  step.push("填提示词");
+
+  // 确定按钮
+  const btnJson = await ev(`(()=>{
+    const d=[...document.querySelectorAll('div[role="dialog"]')].filter(e=>e.offsetHeight>0&&e.querySelector('.atm-detail-page'))[0];
+    if(!d) return null;
+    const b=[...d.querySelectorAll('button')].filter(x=>x.offsetHeight>0&&x.innerText.trim()==='确定')[0];
+    if(!b) return null;
+    const r=b.getBoundingClientRect();
+    return {disabled:b.disabled, x:r.left+r.width/2, y:r.top+r.height/2};
+  })()`);
+  if (!btnJson) return { ok: false, err: "找不到确定按钮", step };
+  if (btnJson.disabled) return { ok: false, err: "确定按钮仍禁用（提示词没进 Slate model）", step };
+
+  await s.clickAt(btnJson.x, btnJson.y);
+  await sleep(3000);
+  step.push("点确定");
+
+  // 权限确认弹窗：勾风险 + 真实点击允许
+  const findConfirm = () => ev(`(()=>{
+    const d=[...document.querySelectorAll('div[role="dialog"]')].filter(e=>e.offsetHeight>0&&/确认允许完全访问/.test(e.innerText))[0];
+    if(!d) return null;
+    const cb=d.querySelector('input[type=checkbox]');
+    const lb=cb?(cb.closest('label')||cb.parentElement):null;
+    const r1=lb?lb.getBoundingClientRect():null;
+    const b=[...d.querySelectorAll('button')].filter(x=>x.offsetHeight>0&&/^允许完全访问$/.test(x.innerText.trim()))[0];
+    const r2=b?b.getBoundingClientRect():null;
+    return {checked:cb?cb.checked:null,
+      cb:r1?{x:r1.left+r1.width/2,y:r1.top+r1.height/2}:null,
+      btn:r2?{x:r2.left+r2.width/2,y:r2.top+r2.height/2}:null};
+  })()`);
+
+  let cf = await findConfirm();
+  if (cf) {
+    if (!cf.checked && cf.cb) {
+      await s.clickAt(cf.cb.x, cf.cb.y);
+      await sleep(700);
+      cf = await findConfirm();
+    }
+    if (!cf || !cf.checked) return { ok: false, err: "风险复选框没勾上", step };
+    step.push("勾选风险确认");
+    if (!cf.btn) return { ok: false, err: "找不到「允许完全访问」按钮", step };
+    await s.clickAt(cf.btn.x, cf.btn.y);
+    await sleep(3000);
+    step.push("点允许完全访问");
+  }
+
+  // 验证
+  const after = await ev(`(()=>{
+    const still=[...document.querySelectorAll('div[role="dialog"]')].filter(e=>e.offsetHeight>0&&/确认允许完全访问/.test(e.innerText))[0];
+    const form=[...document.querySelectorAll('div[role="dialog"]')].filter(e=>e.offsetHeight>0&&e.querySelector('.atm-detail-page'))[0];
+    const cards=[...document.querySelectorAll('.atm-task-card__name')].map(e=>e.innerText.trim());
+    return {dialogGone:!still, formGone:!form, created:cards.includes(${JSON.stringify(name)}), total:cards.length};
+  })()`);
+
+  return { ok: after.created && after.dialogGone, ...after, step };
+}
+
 async function runSummons(s, names, jsFn) {
   for (const name of names) {
     console.log(`\n== ${name}`);
@@ -140,6 +254,49 @@ async function runSummons(s, names, jsFn) {
     if (r.ok) { const done = await waitIdle(s); console.log("   对话完成:", done); await backHome(s); }
     await sleep(3000);
   }
+}
+
+// 删除定时任务：更多菜单（JS click 可开，真实鼠标常因视图弹回落空）→ 删除 → 确认
+async function removeAutomation(s, name) {
+  const ev = (e) => s.eval(e);
+
+  const opened = await ev(`(async()=>{const sp=ms=>new Promise(r=>setTimeout(r,ms));
+    const nav=[...document.querySelectorAll('button')].find(x=>x.offsetHeight>0&&x.innerText.trim()==='定时任务');
+    if(nav) { nav.click(); await sp(2000); }
+    const c=[...document.querySelectorAll('.atm-task-card')].find(e=>e.innerText.includes(${JSON.stringify(name)}));
+    if(!c) return 'not-found';
+    const b=[...c.querySelectorAll('button')].find(x=>(x.getAttribute('aria-label')||'')==='更多');
+    if(!b) return 'no-more';
+    b.click(); await sp(1000);
+    return document.querySelector('.atm-task-card__menu-danger')?'ok':'no-menu';
+  })()`);
+  if (opened !== "ok") return { ok: false, err: opened };
+
+  const del = await ev(`(()=>{
+    const el=document.querySelector('.atm-task-card__menu-danger');
+    if(!el) return null; const r=el.getBoundingClientRect();
+    return {x:r.left+r.width/2, y:r.top+r.height/2};
+  })()`);
+  if (!del) return { ok: false, err: "菜单项消失" };
+  await s.clickAt(del.x, del.y);
+  await sleep(1500);
+
+  const conf = await ev(`(()=>{
+    const box=[...document.querySelectorAll('div[role="dialog"]')].filter(e=>e.offsetHeight>0)
+      .find(e=>/确认删除/.test(e.innerText));
+    if(!box) return null;
+    const btn=[...box.querySelectorAll('button')].filter(x=>x.offsetHeight>0&&/^(删除|确定)$/.test(x.innerText.trim())).pop();
+    if(!btn) return null;
+    const r=btn.getBoundingClientRect();
+    return {x:r.left+r.width/2, y:r.top+r.height/2};
+  })()`);
+  if (!conf) return { ok: false, err: "确认弹窗没出现" };
+  await s.clickAt(conf.x, conf.y);
+  await sleep(2000);
+
+  const after = await ev(`(()=>{const cards=[...document.querySelectorAll('.atm-task-card__name')].map(e=>e.innerText.trim());
+    return {gone:!cards.includes(${JSON.stringify(name)}), total:cards.length}})()`);
+  return { ok: after.gone, ...after };
 }
 
 // ---------- 主流程 ----------
@@ -155,6 +312,8 @@ async function runSummons(s, names, jsFn) {
   experts "专家名1" [...]   召唤专家并发起对话
   teams "专家团名1" [...]   召唤专家团
   templates                 五个分类模板各发一条
+  automation "<名>" "<提示>" 新建定时任务（含权限确认，默认每天）
+  automation-rm "<名>"      删除指定定时任务
   app                       打开「发现应用」并启动第一个应用
   pending                   列出「待确认」会话
   tc "<会话名>"             真实鼠标点击切换会话
@@ -222,6 +381,23 @@ async function runSummons(s, names, jsFn) {
     await runSummons(s, args, TEAM_JS);
   } else if (cmd === "templates") {
     console.log(JSON.stringify(await s.eval(TEMPLATES_JS), null, 2));
+  } else if (cmd === "automation") {
+    const [name, prompt] = args;
+    if (!name || !prompt) {
+      console.error('用法: node wb-tasks.cjs automation "<任务名>" "<提示词>"');
+      process.exit(1);
+    }
+    const r = await createAutomation(s, name, prompt);
+    console.log(JSON.stringify(r, null, 2));
+    s.close();
+    process.exit(r.ok ? 0 : 1);
+  } else if (cmd === "automation-rm") {
+    const name = args[0];
+    if (!name) { console.error('用法: node wb-tasks.cjs automation-rm "<任务名>"'); process.exit(1); }
+    const r = await removeAutomation(s, name);
+    console.log(JSON.stringify(r, null, 2));
+    s.close();
+    process.exit(r.ok ? 0 : 1);
   } else if (cmd === "app") {
     // 「发现应用」：真实点击触发器，再启动第一个推荐应用
     const rect = await s.eval(`(()=>{

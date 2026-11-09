@@ -36,6 +36,7 @@ jobs:
           node scripts/wb-growth.cjs --help
           node scripts/wb-tasks.cjs --help
           node scripts/wb-harvest.cjs --help
+          node scripts/wb-doctor.cjs --help
 
       - name: No credentials committed
         run: |

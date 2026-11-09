@@ -13,9 +13,9 @@
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D18-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
 [![Dependencies](https://img.shields.io/badge/dependencies-0-blue)](#)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)](#)
-[![Version](https://img.shields.io/badge/version-1.1.1-orange)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.2.0-orange)](CHANGELOG.md)
 
-[功能](#-功能一览) · [快速开始](#-快速开始) · [架构](#-架构) · [命令参考](#-命令参考) · [安全](#-安全设计) · [迭代](#-版本与迭代)
+[功能](#-功能一览) · [第一步](#-第一步跑一条命令就知道该干嘛) · [快速开始](docs/quickstart.md) · [架构](#-架构) · [命令参考](#-命令参考) · [安全](#-安全设计) · [迭代](#-版本与迭代)
 
 </div>
 
@@ -30,15 +30,53 @@ WorkBuddy 的「成长计划」有 18+ 个任务：签到、召唤专家、用�
 
 > ⚡ 实测战绩：18 个成长任务自动完成 15 个，3 个剩余任务均需真人扫码/账号授权，物理不可自动。
 
+## 🩺 第一步：跑一条命令就知道该干嘛
+
+别读文档，先跑这个。**只读自检，不改任何状态，跑几次都行**：
+
+```bash
+node scripts/wb-doctor.cjs
+```
+
+```console
+$ node scripts/wb-doctor.cjs
+
+WorkBuddy 成长计划 · 环境自检
+====================================================
+[ OK ] Node 22.22.2
+[ OK ] 端点文件存在
+[ OK ] 握手成功，pipe: wb.entitlement, wb.request, wb.wecom-a2a
+[ OK ] 共 18 个 · 已完成 15 · 进行中 3 · 未接取 0
+[WARN] 可自动完成 1 个: automation_1
+       -> node scripts/wb-tasks.cjs automation "<任务名>" "<提示词>"
+[WARN] 需真人处理 2 个: playbook_prompt(...); wb_wechat_oa_subscribe_task(关注公众号…)
+[ OK ] 端口 9222 可连，4 个 target
+[ OK ] 主窗口已识别
+[ OK ] 行业模板: 通用（未锁定）
+====================================================
+下一步跑这条:
+  node scripts/wb-tasks.cjs automation "<任务名>" "<提示词>"
+```
+
+它替你判断四件事：**环境能不能跑**（Node / wbipc / CDP）、**任务接没接**、**哪些能自动哪些必须你自己点**、**行业模板有没有把专家市场锁死**。
+最后一行直接给命令，照着敲就行。`--json` 可输出机器可读结果。
+
+> ⚠️ **最容易漏的一步**：`accept-all` 接任务。
+> 成长计划每个任务都有个「去完成」按钮，**没点之前你做什么都不计数**。
+> 服务端把这状态叫 `not_accepted`（不是文档写的 `available`）——旧版只认 `available`，于是新号一个都接不上。
+> 换号、久未跑、客户端升级后，都先补这一条。详见 [docs/quickstart.md](docs/quickstart.md)。
+
 ## ✨ 功能一览
 
 | 能力 | 入口 | 路线 | 幂等 |
 |---|---|---|---|
+| 环境自检 + 下一步建议 | `wb-doctor.cjs` | 混合 | ✅ 只读 |
 | 任意官方 API 调用（借客户端登录态） | `wb-call.cjs` | wbipc | - |
 | 成长任务：查状态 / 接取 / 领奖 | `wb-growth.cjs` | wbipc | ✅ |
 | 一键收割：签到+旅行+任务+连登+抽奖 | `wb-harvest.cjs` | wbipc | ✅ |
 | 召唤专家 / 专家团并完成对话 | `wb-tasks.cjs experts/teams` | CDP | ✅ |
 | 五类模板一键使用 | `wb-tasks.cjs templates` | CDP | ✅ |
+| 新建 / 删除定时任务（含权限确认） | `wb-tasks.cjs automation` | CDP | ✅ |
 | 发现应用面板真实打开 | `wb-tasks.cjs app` | CDP | ✅ |
 | 「待确认」会话排查与答复 | `wb-tasks.cjs pending/tc/visit` | CDP | ✅ |
 | 窗口截图 / 任意 JS 注入（调试） | `wb-tasks.cjs shot/eval` | CDP | - |
@@ -87,9 +125,9 @@ $ node scripts/wb-tasks.cjs experts "抖音策略师"
 ### 三条命令上手
 
 ```bash
-node scripts/wb-growth.cjs status       # 1. 摸底：哪些任务没完成
+node scripts/wb-growth.cjs accept-all   # 1. 先接任务（不接，后面做什么都不计数）
 node scripts/wb-harvest.cjs             # 2. 收割：签到/旅行/接任务/领奖/抽奖
-node scripts/wb-growth.cjs claim-all    # 3. 收尾：领取全部已完成奖励
+node scripts/wb-growth.cjs claim-all    # 3. 收尾：领取全部已完成奖励（等 1~5 分钟再跑）
 ```
 
 体验类任务（需 CDP）：
@@ -98,7 +136,10 @@ node scripts/wb-growth.cjs claim-all    # 3. 收尾：领取全部已完成奖�
 node scripts/wb-tasks.cjs experts "中国电商运营专家" "抖音策略师"
 node scripts/wb-tasks.cjs teams "内容创作专家团" "花叔数据分析专家团"
 node scripts/wb-tasks.cjs templates     # 模板 5 连
+node scripts/wb-tasks.cjs automation "每日工作复盘" "总结今天完成的工作，列3条成果和1条明日重点"
 ```
+
+逐步详解 + 卡点对照表见 **[docs/quickstart.md](docs/quickstart.md)**。
 
 > **Git Bash 用户注意**：直接调 `wb-call.cjs GET /v2/...` 时路径会被 MSYS 转换，
 > 必须加 `MSYS_NO_PATHCONV=1`（`wb-growth.cjs` / `wb-harvest.cjs` 进程内调用，不受影响）。
@@ -142,11 +183,21 @@ flowchart LR
 
 ## 📖 命令参考
 
+### wb-doctor.cjs — 开跑前自检（建议每次都先跑）
+
+```bash
+node scripts/wb-doctor.cjs          # 人类可读
+node scripts/wb-doctor.cjs --json   # 机器可读（有 FAIL 时退出码 1）
+```
+
+检查：Node 版本 / wbipc 端点与握手 / CDP 端口与主窗口 / 任务接取状态 / 可自动 vs 需真人 / 行业模板锁。
+不改任何状态。
+
 ### wb-growth.cjs — 任务速查/领奖
 
 ```bash
 node scripts/wb-growth.cjs status [--json]   # 任务列表：code/状态/进度/标题
-node scripts/wb-growth.cjs accept-all        # 接取所有 available 任务
+node scripts/wb-growth.cjs accept-all        # 接取所有未接任务（available + not_accepted）
 node scripts/wb-growth.cjs claim <code>      # 领单个
 node scripts/wb-growth.cjs claim-all         # 领全部 completed
 ```
@@ -168,6 +219,8 @@ node scripts/wb-harvest.cjs --tasks-out=t.json
 | `experts "名1" ...` | 搜索→点卡片→召唤→发送预填话术→等对话结束，模糊匹配 |
 | `teams "团1" ...` | 同上，先切「专家团」页签 |
 | `templates` | 金融/数据/PPT/研究/策划 五分类各发一条 |
+| `automation "<名>" "<提示>"` | 新建定时任务：填名填词→确定→勾风险确认→允许完全访问，默认每天 |
+| `automation-rm "<名>"` | 删除指定定时任务（更多→删除→确认） |
 | `app` | 真实点击打开「发现应用」 |
 | `pending` | 列出所有「待确认」会话 |
 | `tc "<会话名>"` | 真实鼠标事件切换会话 |
@@ -194,7 +247,9 @@ node scripts/wb-harvest.cjs --tasks-out=t.json
 
 - 任务进度服务端校验有 **1~5 分钟延迟**，发送后立刻查 status 会误判失败——等一会再查。
 - 「体验发现应用」需真实启动一个应用才计数（仅打开面板不计数，实测）。
+- 「探索优秀灵感」首页内容位为空（受服务端 feature flag 控制），没有可点的卡片，物理不可自动。
 - 「腾讯轻量云专家」等需连接器授权、「关注公众号」需微信扫码+24 小时——物理不可自动。
+- 定时任务的权限弹窗必须先勾「我已了解风险」才能点「允许完全访问」，且该按钮用 JS `.click()` 会被 tooltip 遮挡——`automation` 命令内置了真实鼠标点击，自己写脚本时注意。
 - UI 路线依赖客户端 DOM 选择器，客户端大改版后需更新（见 [docs/pitfalls.md](docs/pitfalls.md) 的选择器清单与重新探测方法）。
 
 ## 🛠 版本与迭代

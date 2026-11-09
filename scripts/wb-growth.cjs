@@ -62,10 +62,20 @@ if (cmd === "__help") {
     } else if (cmd === "accept-all") {
       const st = await fetch("GET", "/v2/activity/growth/tasks");
       const tasks = st.data?.tasks ?? [];
-      const codes = tasks.filter((t) => t.accept_status === "available").map((t) => t.task_code);
+      // 实测服务端对未接取任务返回 not_accepted（不是 available），两者都要收
+      const PENDING = new Set(["available", "not_accepted", "unaccepted", "pending", ""]);
+      const codes = tasks
+        .filter((t) => PENDING.has(t.accept_status ?? "") || t.accept_status == null)
+        .filter((t) => t.accept_status !== "completed" && t.accept_status !== "claimed")
+        .map((t) => t.task_code);
       if (!codes.length) { console.log("无待接取任务"); return; }
       const j = await fetch("POST", "/v2/activity/growth/tasks/accept", { body: { task_codes: codes } });
-      console.log(j.ok ? `已接取 ${codes.length} 个任务` : `接取失败: ${JSON.stringify(j.body).slice(0, 200)}`);
+      if (j.body?.code === 0) {
+        const got = j.body?.data?.accepted ?? j.body?.data?.task_codes ?? codes;
+        console.log(`已接取 ${Array.isArray(got) ? got.length : codes.length} 个任务: ${codes.join(",")}`);
+      } else {
+        console.log(`接取失败: ${JSON.stringify(j.body).slice(0, 300)}`);
+      }
     } else {
       console.error("unknown command: status | claim | claim-all | accept-all");
       process.exit(1);

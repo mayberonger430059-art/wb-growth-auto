@@ -7,7 +7,7 @@
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| GET | `/v2/activity/growth/tasks` | 任务列表。任务字段：`task_code / title / accept_status(available/accepted/in_progress/completed/claimed) / progress{current,target} / has_reward / reward_credit / jump_url / description` |
+| GET | `/v2/activity/growth/tasks` | 任务列表。任务字段：`task_code / title / accept_status(not_accepted/available/accepted/in_progress/completed/claimed) / progress{current,target} / has_reward / reward_credit / jump_url / description` |
 | POST | `/v2/activity/growth/tasks/accept` | 接任务（登记进度跟踪）。body: `{"task_codes": [...]}` |
 | POST | `/v2/activity/growth/tasks/{task_code}/claim` | 领取奖励。返回 `{credit, energy}` |
 | GET | `/v2/activity/growth/subscribe-task/status` | 公众号订阅任务状态（需微信扫码关注，不自动做） |
