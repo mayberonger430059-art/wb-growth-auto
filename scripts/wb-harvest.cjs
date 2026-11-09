@@ -172,6 +172,18 @@ async function doLottery(client, ch) {
 
 // ---------- 主流程 ----------
 (async () => {
+  if (ARGS.has("--help") || ARGS.has("-h")) {
+    console.log(`用法: node wb-harvest.cjs [开关]
+一键收割：签到 + 猫猫旅行 + 任务接取/领奖 + 连登 + 抽奖。
+
+开关:
+  --no-checkin / --no-travel / --no-tasks / --no-lottery   跳过对应模块
+  --report           仅查询汇总（不执行领奖等写操作）
+  --tasks-out=<路径>  把任务 JSON 另存到指定文件
+
+需本机 WorkBuddy 客户端运行中（wbipc 登录态）。`);
+    process.exit(0);
+  }
   await withClient(async (client, ch) => {
     if (DO_CHECKIN) await doCheckin(client, ch);
     if (DO_TRAVEL) await doTravel(client, ch);
