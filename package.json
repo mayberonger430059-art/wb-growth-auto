@@ -1,6 +1,6 @@
 {
   "name": "wb-growth-auto",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "WorkBuddy 成长计划自动完成器：任务查询/接取/领奖、签到、猫猫旅行、抽奖（wbipc 桥），以及 CDP 驱动的体验类任务 UI 自动化",
   "license": "MIT",
   "type": "commonjs",

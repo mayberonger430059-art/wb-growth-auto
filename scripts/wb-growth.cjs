@@ -11,7 +11,19 @@
 
 const { withClient, wbFetch } = require("./lib/wbipc.cjs");
 
-const cmd = process.argv[2] || "status";
+const cmd = process.argv.includes("--help") || process.argv.includes("-h") ? "__help" : (process.argv[2] || "status");
+
+if (cmd === "__help") {
+  console.log(`用法: node wb-growth.cjs <命令>
+  status            列出任务：task_code / 状态 / 进度 / 标题
+  status --json     输出原始 JSON
+  claim <code>      领取单个任务奖励
+  claim-all         幂等领取所有 completed 且有奖励的任务
+  accept-all        接取所有 available 任务（登记进度跟踪）
+
+需本机 WorkBuddy 客户端运行中（wbipc 登录态）。`);
+  process.exit(0);
+}
 
 (async () => {
   await withClient(async (client, ch) => {

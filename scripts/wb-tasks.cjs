@@ -144,11 +144,27 @@ async function runSummons(s, names, jsFn) {
 
 // ---------- 主流程 ----------
 (async () => {
-  const [cmd, ...args] = process.argv.slice(2);
-  if (!cmd || cmd === "help") {
-    console.error("用法见文件头注释；命令: experts|teams|templates|app|pending|tc|visit|shot|eval|targets");
-    process.exit(1);
+  let [cmd0, ...rest0] = process.argv.slice(2);
+  if (cmd0 === "--help" || cmd0 === "-h") cmd0 = "help";
+  if (!cmd0 || cmd0 === "help") {
+    console.log(`用法: node wb-tasks.cjs <命令> [参数]
+
+前置：WorkBuddy 桌面端以 --remote-debugging-port=9222 启动（WB_CDP_PORT 可换端口）。
+
+命令:
+  experts "专家名1" [...]   召唤专家并发起对话
+  teams "专家团名1" [...]   召唤专家团
+  templates                 五个分类模板各发一条
+  app                       打开「发现应用」并启动第一个应用
+  pending                   列出「待确认」会话
+  tc "<会话名>"             真实鼠标点击切换会话
+  visit "<会话名>" [图]     切会话+截图+抓按钮（防焦点弹回）
+  shot <路径>               截图当前窗口
+  eval "<js>"               主窗口执行任意 JS
+  targets                   列出 CDP 目标`);
+    process.exit(0);
   }
+  const cmd = cmd0, args = rest0;
   if (cmd === "targets") { console.log(JSON.stringify(await listTargets(), null, 2)); return; }
 
   const s = await mainWindow();

@@ -2,6 +2,13 @@
 
 本项目遵循 [SemVer](https://semver.org/lang/zh-CN/)。
 
+## [1.1.1] - 2026-11-09
+
+### Added
+- 四个 CLI 统一支持 `--help` / `-h`（免客户端可查用法）。
+- GitHub Actions CI：Node 18/20/22 语法校验 + `--help` 冒烟 + 凭据泄漏检查（endpoint.json 不入库）。
+- README 头部挂载项目 logo；新增 README_EN、CONTRIBUTING、Issue 模板。
+
 ## [1.1.0] - 2026-11-09
 
 ### Changed

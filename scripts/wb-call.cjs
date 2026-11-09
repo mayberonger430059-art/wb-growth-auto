@@ -13,6 +13,16 @@
 const { withClient, wbFetch } = require("./lib/wbipc.cjs");
 
 (async () => {
+  if (process.argv.includes("--help") || process.argv.includes("-h")) {
+    console.log(`用法: node wb-call.cjs <METHOD> <PATH> [JSON_BODY]
+示例:
+  node wb-call.cjs GET /v2/activity/growth/tasks
+  node wb-call.cjs POST /v2/activity/growth/tasks/accept '{"task_codes":["..."]}'
+
+Git Bash 注意：路径参数会被 MSYS 转换，需 MSYS_NO_PATHCONV=1。
+退出码：0=成功，2=HTTP/业务错误，1=连接/参数错误。`);
+    process.exit(0);
+  }
   const method = (process.argv[2] || "GET").toUpperCase();
   const apiPath = process.argv[3];
   if (!apiPath) {
