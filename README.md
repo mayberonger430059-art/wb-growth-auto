@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="docs/assets/logo.png" alt="wb-growth-auto logo" width="160" />
+
 # 🚀 wb-growth-auto
 
 **WorkBuddy 成长计划自动完成器**
