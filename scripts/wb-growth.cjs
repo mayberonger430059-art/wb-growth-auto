@@ -10,6 +10,7 @@
 "use strict";
 
 const { withClient, wbFetch } = require("./lib/wbipc.cjs");
+const { isPendingTake } = require("./lib/growth-rules.cjs");
 
 const cmd = process.argv.includes("--help") || process.argv.includes("-h") ? "__help" : (process.argv[2] || "status");
 
@@ -62,12 +63,8 @@ if (cmd === "__help") {
     } else if (cmd === "accept-all") {
       const st = await fetch("GET", "/v2/activity/growth/tasks");
       const tasks = st.data?.tasks ?? [];
-      // 实测服务端对未接取任务返回 not_accepted（不是 available），两者都要收
-      const PENDING = new Set(["available", "not_accepted", "unaccepted", "pending", ""]);
-      const codes = tasks
-        .filter((t) => PENDING.has(t.accept_status ?? "") || t.accept_status == null)
-        .filter((t) => t.accept_status !== "completed" && t.accept_status !== "claimed")
-        .map((t) => t.task_code);
+      // 判定规则见 lib/growth-rules.cjs：服务端对未接取任务返回 not_accepted（不是 available）
+      const codes = tasks.filter((t) => isPendingTake(t.accept_status)).map((t) => t.task_code);
       if (!codes.length) { console.log("无待接取任务"); return; }
       const j = await fetch("POST", "/v2/activity/growth/tasks/accept", { body: { task_codes: codes } });
       if (j.body?.code === 0) {

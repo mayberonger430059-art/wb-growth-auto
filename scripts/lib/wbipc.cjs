@@ -115,7 +115,7 @@ class WbipcClient {
   constructor(endpoint, ticket, clientInfo) {
     this.endpoint = endpoint;
     this.ticket = ticket;
-    this.clientInfo = clientInfo || { kind: "script", id: "wb-growth-auto", version: "1.2.0" };
+    this.clientInfo = clientInfo || { kind: "script", id: "wb-growth-auto", version: "1.2.1" };
     this.sock = null;
     this.pending = new Map();
     this.nextId = 1;

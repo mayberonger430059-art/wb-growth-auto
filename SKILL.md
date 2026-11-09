@@ -1,7 +1,7 @@
 ---
 name: wb-growth-auto
 description: WorkBuddy 成长计划自动完成器。查询/接取/领取成长计划任务奖励、自动签到、猫猫旅行、抽奖（wbipc 本地桥，零凭据接触），并可通过 CDP 驱动客户端真实完成体验类任务：召唤专家/专家团、使用模板、新建定时任务、处理「待确认」会话。触发词：成长计划、growth、任务奖励、领积分、每日签到、召唤专家、专家团、待确认、定时任务。
-version: "1.2.0"
+version: "1.2.1"
 license: MIT
 display_name: WorkBuddy成长计划自动完成器
 display_name_en: WorkBuddy Growth Auto

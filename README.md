@@ -13,7 +13,7 @@
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D18-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
 [![Dependencies](https://img.shields.io/badge/dependencies-0-blue)](#)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)](#)
-[![Version](https://img.shields.io/badge/version-1.2.0-orange)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.2.1-orange)](CHANGELOG.md)
 
 [功能](#-功能一览) · [第一步](#-第一步跑一条命令就知道该干嘛) · [快速开始](docs/quickstart.md) · [架构](#-架构) · [命令参考](#-命令参考) · [安全](#-安全设计) · [迭代](#-版本与迭代)
 
@@ -255,9 +255,11 @@ node scripts/wb-harvest.cjs --tasks-out=t.json
 ## 🛠 版本与迭代
 
 - 遵循 [SemVer](https://semver.org/lang/zh-CN/)，变更记录见 [CHANGELOG.md](CHANGELOG.md)。
+- **规则层有单测**：`npm test`（`scripts/self-test.cjs`，19 条断言，零依赖、不需要客户端），CI 在 Node 18/20/22 三档都跑。
+  接取状态判定、任务码→命令映射、行业模板锁定判定都有覆盖——这三条正是历史上各踩死过一次的地方。
 - 客户端改版导致选择器失效：`wb-tasks.cjs eval` 探测新 DOM → 更新选择器 → 升 minor。
 - 接口变更：`wb-harvest.cjs --dump` 抓原始响应 → 更新字段映射 → 升 patch/minor。
-- 更多接口细节：[docs/api.md](docs/api.md)；踩坑实录：[docs/pitfalls.md](docs/pitfalls.md)。
+- 更多接口细节：[docs/api.md](docs/api.md)；踩坑实录：[docs/pitfalls.md](docs/pitfalls.md)；上手流程：[docs/quickstart.md](docs/quickstart.md)。
 
 ## 📦 作为 WorkBuddy 技能安装
 

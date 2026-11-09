@@ -12,7 +12,7 @@ Expert summoning · Templates · Scheduled tasks · Pending confirmations — re
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D18-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
 [![Dependencies](https://img.shields.io/badge/dependencies-0-blue)](#)
-[![Version](https://img.shields.io/badge/version-1.2.0-orange)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.2.1-orange)](CHANGELOG.md)
 
 **[中文文档](README.md)** · English
 

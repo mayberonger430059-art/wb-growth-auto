@@ -1,6 +1,6 @@
 {
   "name": "wb-growth-auto",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "WorkBuddy 成长计划自动完成器：环境自检、任务查询/接取/领奖、签到、猫猫旅行、抽奖（wbipc 桥），以及 CDP 驱动的体验类任务 UI 自动化（专家/专家团/模板/定时任务）",
   "license": "MIT",
   "type": "commonjs",
@@ -20,7 +20,8 @@
     "report": "node scripts/wb-harvest.cjs --report",
     "doctor": "node scripts/wb-doctor.cjs",
     "accept": "node scripts/wb-growth.cjs accept-all",
-    "claim": "node scripts/wb-growth.cjs claim-all"
+    "claim": "node scripts/wb-growth.cjs claim-all",
+    "test": "node scripts/self-test.cjs"
   },
   "keywords": [
     "workbuddy",

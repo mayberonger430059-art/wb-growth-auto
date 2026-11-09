@@ -38,24 +38,9 @@ const icon = (l) => (l === "ok" ? "[ OK ]" : l === "warn" ? "[WARN]" : "[FAIL]")
 })();
 
 // ---------- 2+4. wbipc 握手 + 任务盘子（同一次连接内完成） ----------
-const DONE = new Set(["completed", "claimed"]);
-
-// 物理不可自动的任务：需要扫码 / 账号授权 / 服务端 feature flag 未开。
-// 这些不放进「待办」，否则用户会一直对着它们跑脚本。
-const MANUAL = {
-  wb_wechat_oa_subscribe_task: "关注公众号（需微信扫码）",
-  playbook_prompt: "探索优秀灵感（客户端内容位为空，受 feature flag 控制）",
-  wb_connect_tencent_cloud: "腾讯云连接器授权（需账号登录）",
-};
-
-// 任务码 → 该用哪条命令。顺序即优先级。
-const CODE_HINTS = [
-  [/automation/i, 'node scripts/wb-tasks.cjs automation "<任务名>" "<提示词>"'],
-  [/expert_team|team/i, 'node scripts/wb-tasks.cjs teams "<专家团名>"'],
-  [/expert/i, 'node scripts/wb-tasks.cjs experts "<专家名>"'],
-  [/template|playbook/i, "node scripts/wb-tasks.cjs templates"],
-  [/app|discover/i, "node scripts/wb-tasks.cjs app"],
-];
+// 判定规则统一放在 lib/growth-rules.cjs（纯函数，scripts/self-test.cjs 有断言），
+// 避免同一套状态判定在 accept-all 与本命令里各写一遍、各踩一次坑。
+const rules = require("./lib/growth-rules.cjs");
 
 let autoTodo = []; // 可自动完成的待办任务码
 
@@ -94,48 +79,33 @@ async function checkApi() {
           return;
         }
         const tasks = st.data?.tasks ?? [];
-        const done = tasks.filter((t) => DONE.has(t.accept_status)).length;
-        const untaken = tasks.filter((t) => {
-          const s = t.accept_status;
-          return !DONE.has(s) && (!s || s === "not_accepted" || s === "available" || s === "unaccepted" || s === "pending");
-        }).length;
-        const running = tasks.length - done - untaken;
+        const c = rules.classifyTasks(tasks);
+        add("ok", "tasks",
+          `共 ${c.total} 个 · 已完成 ${c.done} · 进行中 ${c.running} · 未接取 ${c.untaken}`, null);
 
-        add("ok", "tasks", `共 ${tasks.length} 个 · 已完成 ${done} · 进行中 ${running} · 未接取 ${untaken}`, null);
-
-        if (untaken > 0) {
-          add("warn", "tasks-accept", `${untaken} 个任务还没接取`,
+        if (c.untaken > 0) {
+          add("warn", "tasks-accept", `${c.untaken} 个任务还没接取`,
             "必须先接取 —— 这是「点去完成」的等价动作，不接取后续动作一律不计数");
         }
 
-        const todo = tasks.filter((t) => {
-          if (DONE.has(t.accept_status)) return false;
-          if (!t.accept_status || /not_accepted|available|unaccepted|pending/.test(t.accept_status)) return false;
-          const cur = t.progress?.current ?? 0;
-          const tgt = t.progress?.target ?? 0;
-          return tgt > 0 && cur < tgt;
-        });
-        const manual = todo.filter((t) => MANUAL[t.task_code]);
-        const auto = todo.filter((t) => !MANUAL[t.task_code]);
+        const manual = c.todo.filter((t) => rules.manualReason(t.task_code));
+        const auto = c.todo.filter((t) => !rules.manualReason(t.task_code));
         autoTodo = auto.map((t) => t.task_code);
 
         if (auto.length) {
-          const hint = CODE_HINTS.find(([re]) => auto.some((t) => re.test(t.task_code)));
+          const hint = rules.hintForTaskCodes(autoTodo);
           add("warn", "tasks-todo",
-            `可自动完成 ${auto.length} 个: ${auto.map((t) => t.task_code).join(", ")}`,
-            hint ? hint[1] : "用 wb-tasks.cjs 的对应子命令完成");
+            `可自动完成 ${auto.length} 个: ${autoTodo.join(", ")}`,
+            hint || "用 wb-tasks.cjs 的对应子命令完成");
         }
         if (manual.length) {
           add("warn", "tasks-manual",
-            `需真人处理 ${manual.length} 个: ${manual.map((t) => `${t.task_code}(${MANUAL[t.task_code]})`).join("; ")}`,
+            `需真人处理 ${manual.length} 个: ${manual.map((t) => `${t.task_code}(${rules.manualReason(t.task_code)})`).join("; ")}`,
             "本工具不代做扫码/授权类动作，留着或自己点");
         }
 
-        const claimable = tasks.filter(
-          (t) => DONE.has(t.accept_status) && t.claim_status && !/claimed|none/.test(t.claim_status)
-        );
-        if (claimable.length) {
-          add("warn", "tasks-claim", `${claimable.length} 个任务有未领取奖励`, "node scripts/wb-growth.cjs claim-all");
+        if (c.claimable.length) {
+          add("warn", "tasks-claim", `${c.claimable.length} 个任务有未领取奖励`, "node scripts/wb-growth.cjs claim-all");
         }
       },
       { verbose: false }
@@ -179,24 +149,23 @@ async function checkCdp() {
 
   // 行业模板锁检测
   // 注意：Hy4 把 .industry-template-switcher__trigger 复用成了「发现应用」按钮，
-  // 按钮文案不再表示行业，唯一可靠信号是修饰类：
-  //   --general  = 通用模板，专家市场为全量
-  //   --<其他>   = 绑定了垂直行业，通用专家搜不到
+  // 按钮文案不再表示行业，唯一可靠信号是修饰类（判定逻辑在 lib/growth-rules.cjs）。
   try {
     const info = await s.eval(`(() => {
       const b = document.querySelector('[class*="industry-template-switcher__trigger--"]');
-      if (!b) return { present: false };
-      const cls = b.className.toString();
-      const m = cls.match(/industry-template-switcher__trigger--([\\w-]+)/);
-      return { present: true, modifier: m ? m[1] : "unknown" };
+      return b ? { present: true, cls: b.className.toString() } : { present: false };
     })()`);
     if (!info.present) {
       add("ok", "industry", "未检测到行业模板标记（通用环境）", null);
-    } else if (info.modifier === "general" || info.modifier === "unknown") {
-      add("ok", "industry", `行业模板: ${info.modifier === "general" ? "通用（未锁定）" : "未识别修饰符"}`, null);
     } else {
-      add("warn", "industry", `专家市场被行业模板锁定: ${info.modifier}`,
-        "点开左上角模板切换器切换为通用模板，否则专家市场只返回该行业专家，搜「电商」「抖音」会 0 结果");
+      const modifier = rules.parseModifier(info.cls);
+      const j = rules.judgeIndustryTemplate(modifier);
+      if (j.locked) {
+        add("warn", "industry", `专家市场被行业模板锁定: ${j.reason}`,
+          "点开左上角模板切换器切换为通用模板，否则专家市场只返回该行业专家，搜「电商」「抖音」会 0 结果");
+      } else {
+        add("ok", "industry", `行业模板: ${j.reason}`, null);
+      }
     }
   } catch (e) {
     add("warn", "industry", `行业模板检测失败: ${String(e.message).slice(0, 100)}`, null);
@@ -217,10 +186,7 @@ function nextCommand() {
   if (hasWarn("tasks-accept")) return "node scripts/wb-growth.cjs accept-all";
   if (hasWarn("industry")) return null; // 需人工点重置图标
   if (hasWarn("tasks-todo")) {
-    for (const [re, cmd] of CODE_HINTS) {
-      if (autoTodo.some((c) => re.test(c))) return cmd;
-    }
-    return 'node scripts/wb-tasks.cjs experts "<专家名>"';
+    return rules.hintForTaskCodes(autoTodo) || 'node scripts/wb-tasks.cjs experts "<专家名>"';
   }
   if (hasWarn("tasks-claim")) return "node scripts/wb-growth.cjs claim-all";
   return "node scripts/wb-harvest.cjs";

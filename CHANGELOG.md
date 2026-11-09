@@ -2,6 +2,17 @@
 
 本项目遵循 [SemVer](https://semver.org/lang/zh-CN/)。
 
+## [1.2.1] - 2026-11-09
+
+### Changed
+- 把三处「曾经各踩一次」的判定从 CLI 里抽成纯函数 `scripts/lib/growth-rules.cjs`：
+  接取状态集合、任务码→命令映射、行业模板修饰符判定。
+  `wb-growth.cjs accept-all` 与 `wb-doctor.cjs` 现在共用同一份规则，不会再出现两处判定不一致。
+
+### Added
+- `scripts/self-test.cjs` —— 19 条规则层断言，零依赖、不需要客户端，`npm test` 可跑。
+- CI 增加单测步骤（Node 18/20/22 三档都跑）。
+
 ## [1.2.0] - 2026-11-09
 
 ### Added
